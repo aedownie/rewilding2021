@@ -8,11 +8,11 @@ library(dplyr)
 
 # The first step is to take the metadata and clean it up for use with the
 # check-in data.
-rawMice2021block1 <- read.csv("~/Data/mice.metadata.2021.block1.csv")
+rawMice2021block1 <- read.csv("~/Data/mice.GxE.metadata.2021.block1.csv")
 mice <- rawMice2021block1
 mice <- filter(mice,Location=="SF") # This data frame includes metadata for mice that
 # were lab-housed for a different element of the experiment.
-# Stay tuned for Oyesola et al.
+# These mice are only analyzed in Oyesola et al.
 # Each mouse had multiple forms of ID; we take the mouse ID from its left ear
 # tag.
 for (i in 1:nrow(mice)){
@@ -38,7 +38,7 @@ mice2021block1 <- mice
 # It has four columns: Wedge (here meaning RFID reader; don't ask), timestamp,
 # RFID, and mouse (which is translated by our system from the RFID).
 rawCIdata2021block1 <- 
-  read.csv("~/Data/2021.block1.clean.complete.csv")
+  read.csv("~/Data/2021.GxE.block1.clean.csv")
 CIdata <- rawCIdata2021block1
 # Some check-in records are either from test RFIDs or are nonsense produced by
 # malfunctions, mostly water damage.
@@ -117,7 +117,7 @@ CIdata <- select(CIdata,Timestamp,RFID,Wedge,Reader,Location,
 CIdata2021block1 <- CIdata
 
 # Now we can repeat the process.  We will largely forego the annotations here.
-rawMice2021block2 <- read.csv("~/Data/mice.metadata.2021.block2.csv")
+rawMice2021block2 <- read.csv("~/Data/mice.GxE.metadata.2021.block2.csv")
 mice <- rawMice2021block2
 mice <- filter(mice,Location=="SF")
 for (i in 1:nrow(mice)){
@@ -139,7 +139,7 @@ mice$time.control.2 <- ifelse(mice$Lost.RFID.2==TRUE|mice$Missing.2==TRUE,
 mice2021block2 <- mice
 
 rawCIdata2021block2 <- 
-  read.csv("~/Documents/Princeton EEB/Stony Ford 2021/SF 2021 Activity/2021.block2.clean.csv")
+  read.csv("~/Documents/Princeton EEB/Stony Ford 2021/SF 2021 Activity/2021.GxE.block2.clean.csv")
 CIdata <- select(rawCIdata2021block2,Wedge:Mouse)
 CIdata$Mouse[which(CIdata$Mouse=="304b")] <- "304"
 CIdata <- filter(CIdata,Mouse!="107")
