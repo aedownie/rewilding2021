@@ -8,13 +8,8 @@ library(dplyr)
 
 # The first step is to take the metadata and clean it up for use with the
 # check-in data.
-rawMice2021block1 <- read.csv("~/Data/mice.GxE.metadata.2021.block1.csv")
+rawMice2021block1 <- read.csv("~/Data/mice.metadata.2021.block1.GxE.csv")
 mice <- rawMice2021block1
-mice <- filter(mice,Location=="SF") # This data frame includes metadata for mice that
-# were lab-housed for a different element of the experiment.
-# These mice are only analyzed in Oyesola et al.
-# Each mouse had multiple forms of ID; we take the mouse ID from its left ear
-# tag.
 for (i in 1:nrow(mice)){
   if (is.na(mice$Left.ear.tag[i])==TRUE) {
     mice$Left.ear.tag[i] <- mice$Right.ear.tag[i]
@@ -38,7 +33,7 @@ mice2021block1 <- mice
 # It has four columns: Wedge (here meaning RFID reader; don't ask), timestamp,
 # RFID, and mouse (which is translated by our system from the RFID).
 rawCIdata2021block1 <- 
-  read.csv("~/Data/2021.GxE.block1.clean.csv")
+  read.csv("~/Data/2021.block1.clean.GxE.csv")
 CIdata <- rawCIdata2021block1
 # Some check-in records are either from test RFIDs or are nonsense produced by
 # malfunctions, mostly water damage.
@@ -117,9 +112,8 @@ CIdata <- select(CIdata,Timestamp,RFID,Wedge,Reader,Location,
 CIdata2021block1 <- CIdata
 
 # Now we can repeat the process.  We will largely forego the annotations here.
-rawMice2021block2 <- read.csv("~/Data/mice.GxE.metadata.2021.block2.csv")
+rawMice2021block2 <- read.csv("~/Data/mice.metadata.2021.block2.GxE.csv")
 mice <- rawMice2021block2
-mice <- filter(mice,Location=="SF")
 for (i in 1:nrow(mice)){
   if (is.na(mice$Left.ear.tag[i])==TRUE) {
     mice$Left.ear.tag[i] <- mice$Right.ear.tag[i]
@@ -139,7 +133,7 @@ mice$time.control.2 <- ifelse(mice$Lost.RFID.2==TRUE|mice$Missing.2==TRUE,
 mice2021block2 <- mice
 
 rawCIdata2021block2 <- 
-  read.csv("~/Documents/Princeton EEB/Stony Ford 2021/SF 2021 Activity/2021.GxE.block2.clean.csv")
+  read.csv("~/Data/2021.block2.clean.GxE.csv")
 CIdata <- select(rawCIdata2021block2,Wedge:Mouse)
 CIdata$Mouse[which(CIdata$Mouse=="304b")] <- "304"
 CIdata <- filter(CIdata,Mouse!="107")
@@ -300,6 +294,6 @@ CIdata2021GxEfiltered <- filter(rbind(temp,temp2),
 # At this point the data can be used for counting the number of check-ins of different
 # types and for building social networks.
 
-# The next script is ______
+# The next script is individual.behavior.calculation.R
 
 

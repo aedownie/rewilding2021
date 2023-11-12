@@ -42,22 +42,22 @@ return(assocInfo)
 # a problem when using something like Euclidean distance.  Just focusing on
 # relative abundance of different CD4 memory T cell phenotypes, for example,
 # avoids confounds from different abundances of CD4 T cells overall.
-fullMLN2021 <- read.csv("~/Block1_Block2.csv")
+fullMLN2021 <- read.csv("~/2021.MLN.flow.analysis.csv")
 # A few IDs need to be corrected
-fullMLN2021$Mouse.ID[which(fullMLN2021$Mouse.ID=="471/666")] <- "471"
-fullMLN2021$Mouse.ID[which(fullMLN2021$Mouse.ID=="7010")] <- "436"
+fullMLN2021$Mouse[which(fullMLN2021$Mouse.ID=="471/666")] <- "471"
+fullMLN2021$Mouse[which(fullMLN2021$Mouse.ID=="7010")] <- "436"
 # Let's break it out by T cells and B cells
 newTcelltemp <- fullMLN2021[,c(1,7:11,18:22)]
 Bcelltemp <- fullMLN2021[,c(1,25:29)]
 
 # We start with the B cell phenotypes.
-Bcelltemp <- rename(Bcelltemp,Mouse=Mouse.ID,
+Bcelltemp <- rename(Bcelltemp,
                     B220percent=X..B220..cells.of.CD45.,
                     CD44hi=X..CD44..B.cells.of.CD45.,
                     CD62Lhi=X..CD62L..Bcells.of.CD45.,
                     CD62LhiCD44hi=X..CD62hiCD44..B.cells.of.CD45.,
                     CD62LhiCD44low=X..CD62hiCD44..B.cells.of.CD45..1)
-# This doesn't have a double-negative column, or a CD62LlowCD44hi, so we get
+# This doesn't have a double-negative column, or a CD62LlowCD44hi, so we calculate
 # those manually.
 Bcelltemp$CD62LlowCD44hi <- Bcelltemp$CD44hi-Bcelltemp$CD62LhiCD44hi
 Bcelltemp$CD62LlowCD44low <- Bcelltemp$B220percent-(Bcelltemp$CD44hi+
@@ -77,7 +77,8 @@ for(i in 1:nrow(BcellProp)){
 # index.
 # NOTE: JI sometimes is rendered with 1 indicating perfect DISsimilarity and
 # 0 indicating perfect similarity.  We use the reverse (see Raulo et al. 2021)
-# for easier interpretation
+# for easier interpretation (i.e. a positive correlation indicates increasing
+# similarity of immune phenotype with increasing value of the variable).
 Jdist <- as.matrix(vegdist(BcellProp[,2:5],method="jaccard"))
 rownames(Jdist) <- colnames(Jdist) <- BcellProp$Mouse
 BcelltempAI <- collate.matrix(Jdist,NumDenom=FALSE)
@@ -146,7 +147,7 @@ full.2021.assoc.info <- d
 
 # We also want to assess combined CD4/CD8 T cell similarity in the whole blood
 flowBlood2021 <- read.csv("~/2021.blood.flow.analysis.csv")
-# First we need to ensure the metadata is clear
+# First we need to ensure the metadata are clear
 flowBlood2021$Genotype[which(flowBlood2021$Genotype=="C57/B6")] <- "C57"
 flowBlood2021$Genotype[which(flowBlood2021$Genotype=="B6")] <- "C57"
 flowBlood2021$Genotype[which(flowBlood2021$Genotype=="129SL")] <- "129"
@@ -155,8 +156,7 @@ flowBlood2021$Infection_Status[which(flowBlood2021$Infection_Status=="No")] <- "
 # Then we can select our columns of interest
 Btemp <- filter(flowBlood2021,Location=="SF")%>%
   select(Sample.ID,Percent.CD4.Tcells,Percent.CD8.Tcells,
-         Percent.CD4.effector.memory:Percent.CD8.double.negative)%>%
-  rename(Mouse=Sample.ID)
+         Percent.CD4.effector.memory:Percent.CD8.double.negative)
 Btemp$Mouse <- as.character(Btemp$Mouse)
 # Here we want to calculate the right relative abundances, as with the MLNs.
 for (i in 1:nrow(Btemp)){
@@ -184,9 +184,9 @@ full.2021.assoc.info <- d
 # The next slice of data for analysis is the CBC data.  This is in a different
 # file, which contains CBC results for the three timepoints.  The results are
 # both the absolute cell abundances and the relative abundances.
-wbc2021 <- read.csv("~/2021.SF.CBC.data.relabeled.csv")
+wbc2021 <- read.csv("~/Data/2021.CBC.data.csv")
 wbc2021 <- select(wbc2021,Unique_Sample_ID:RBC_count)
-wbc2021 <- rename(wbc2021,Mouse=Princeton.NIH_Tag,Timepoint=Time_place_of_CBC_analysis)
+wbc2021 <- rename(wbc2021,Timepoint=Time_place_of_CBC_analysis)
 wbc2021 <- filter(wbc2021,Location!="")
 wbc2021 <- filter(wbc2021,Mouse%in%unique(mice2021total$Mouse))
 
@@ -259,8 +259,8 @@ full.2021.assoc.info <- d
 # These two quantities are best analyzed with Manhattan distance
 
 # First we do plasma cytokine levels
-plasmaCyt <- read.csv("~/FINAL.csv")
-plasmaCyt <- rename(plasmaCyt,Mouse=PrincetonID,
+plasmaCyt <- read.csv("~/Data/2021.plasma.cyt.csv")
+plasmaCyt <- rename(plasmaCyt,
                     IFN=IFN....A4.,IL5=IL.5..A5.,TNF=TNF....A6.,
                     IL6=IL.6..A8.,IL17A=IL.17A..B4.,IL22=IL.22..B7.)
 # We need to transform the plasma cytokine levels, because we expect them to
@@ -282,7 +282,7 @@ full.2021.assoc.info <- d
 # expression relative to a control treatment (here exposure to PBS).  We
 # normalize expression as log2((treatment/control)+1).  This is the same method
 # as employed in Lin et al. (2020) and Yeung et al. (2020).
-cytProd <- read.csv("Final final cytokines.csv")
+cytProd <- read.csv("~/Data/2021.MLN.cytokine.prod.csv")
 temp <- cytProd
 # Regrettably the normalization has to be done for each cytokine manually.
 temp[,6:11] <- temp[,6:11]/temp[,5] # IFNg
@@ -298,7 +298,6 @@ temp[,69:74] <- temp[,69:74]/temp[,68] # IL22
 temp[,76:81] <- temp[,76:81]/temp[,75] # IL13
 # We then want to remove the control for each cytokine.
 temp <- temp[,c(1,6:11,13:18,20:25,27:32,34:39,41:46,48:53,55:60,62:67,69:74,76:81)]
-temp <- rename(temp,Mouse=X)
 temp[,2:67] <- log2(temp[,2:67]+1)
 # Normalization is now complete.
 # Some of the mouse IDs have to be corrected.
@@ -354,8 +353,6 @@ for(i in 1:ncol(taxonInfo)){
   greatestDepth[i] <- depth
 }
 
-d <- filter(mbData,Timepoint=="5 weeks")
-d <- filter(d,Mouse%in%mice2021GxE$Mouse) # 68 mice (fewer than I might have thought?)
 colnames(d)[4:ncol(d)] <- taxa
 d <- select(d,-Row.names,-Timepoint)
 d <- d[,which(colSums(d[2:ncol(d)])!=0)] # More filtering
@@ -376,11 +373,9 @@ Jdist <- as.matrix(vegan::vegdist(temp[,2:ncol(temp)]),
 rownames(Jdist) <- colnames(Jdist) <- temp$Mouse
 mbtempAI <- collate.matrix(Jdist,NumDenom=FALSE)
 mbtempAI <- rename(mbtempAI,AI=SocAssoc)
-d <- merge.AI(full.2021.assoc.info,mbtempAI) # Got some warnings, need to chase down
-# May occur where we have multiple samples for a mouse?
-# That seems to be correct.  Need to double-check the 446 results.
+d <- merge.AI(full.2021.assoc.info,mbtempAI)
 d <- rename(d,mbJI=NewAI)
 d$mbJI <- 1-d$mbJI
 full.2021.assoc.info <- d
 
-
+# The next script is statistical.analyses.R

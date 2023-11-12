@@ -10,12 +10,12 @@ library(brms)
 # A key issue in assessment of some behavioral traits is that some mice either
 # lost RFID tags during the experiment or escaped their home enclosure during
 # the experiment.  These mice are not useful for assessing predictors of mouse
-# behavior.  But they can be used for assessing the relationship between actual
-# behavior and immune similarity (see Methods for more).
+# behavior.  But some can be used for assessing the relationship between actual
+# behavior and immune similarity (only the escapees; see Methods for more).
 # In addition, several mice were released and either never recaptured or were
 # recaptured at the mindpoint but not at the end.
 # We must create a vector with these mice so that they can be filtered out when
-# appropriate.
+# appropriate from analyses and plots.
 nonCaptures <- c("401","418","430","457","458","462","463","464","108",
                  "109","315","322","278","473")
 escapees <- c("411","421","423","457","464","469","471","474","302","305")
@@ -28,7 +28,7 @@ behaviorSelection <- union(nonCaptures,union(escapees,RFIDloss))
 # origin, parentage.
 # Possible fixed effects: strain, infection status
 # Possible random effects: block, wedge, cage of origin, parentage
-# Results in Table S???
+# Results in Table S1
 d <- mice2021GxE
 # Some cage numbers are repeated across blocks, so a unique identifier including
 # both is needed to avoid issues in using cage of origin as a random effect.
@@ -39,11 +39,11 @@ CIpN.model <- brm(log10(CIpN) ~ Genotype + Infected,
              data=d,family="gaussian",iter=3000,warmup=1000,
              chains=1,cores=1,inits="random")
 
-# Post-trap check-ins per night, by mouse strain, block, enclosure, infection status,
-# cage of origin, parentage.
+# Post-trap check-ins per night, by mouse strain, block, enclosure, infection
+# status, cage of origin, parentage.
 # Possible fixed effects: strain, infection status
 # Possible random effects: block, wedge, cage of origin, parentage
-# Results in Table S3
+# Results shown in Table S6
 d <- mice2021GxE
 d$CageUnique <- paste(d$Cage,d$Block,sep="-")
 d <- filter(d,!(Mouse%in%behaviorSelection))
@@ -52,12 +52,12 @@ PTCIpN.model <- brm(log10(PTCIpN) ~ Genotype + Infected,
              data=d,family="gaussian",iter=3000,warmup=1000,
              chains=1,cores=1,inits="random")
 
-# Proportion of feeder check-ins, by mouse strain, block, enclosure, infection status,
-# cage of origin, parentage.
+# Proportion of feeder check-ins, by mouse strain, block, enclosure, infection
+# status, cage of origin, parentage.
 # Possible fixed effects: strain, infection status
 # Possible random effects: block, wedge, cage of origin, parentage
 # Test: linear mixed model, logistic
-# Results in Table S1
+# Results in Table S3
 d <- mice2021GxE
 d$CageUnique <- paste(d$Cage,d$Block,sep="-")
 d <- d[which(d$Total!=0&!(d$Mouse%in%behaviorSelection)),]
@@ -67,13 +67,13 @@ feederProp.model <- brm(Feeder|trials(Total) ~ Infected +
                    data=d,family="binomial",warmup=1000,iter=3000,
                    chains=1,cores=1,inits="random")
 
-# Minimum distance traveled as a function of strain, infection status, block, wedge,
-# cage of origin, parentage
+# Minimum distance traveled as a function of strain, infection status, block,
+# wedge, cage of origin, parentage
 # Possible fixed effects: strain, infection status
 # Possible random effects: block, wedge, cage of origin, parentage
 # Test: linear mixed model, normal distribution
-# Results in Table S???
-d <- mice2021GxE
+# Results in Table S2
+d <- mice2021total
 d$CageUnique <- paste(d$Cage,d$Block,sep="-")
 d$Distance <- d$Distance/d$Nights
 d <- d[which(d$Distance!=0),]
@@ -84,12 +84,22 @@ dist.model <- brm(log10(Distance) ~ Genotype +
                    family="gaussian",data=d,warmup=1000,iter=4000,
                    cores=1,chains=1,inits="random")
 
+# Mean nightly roaming entropy traveled as a function of strain, infection
+# status, block, wedge, cage of origin, parentage
+# Possible fixed effects: strain, infection status, check-ins per night
+# Possible random effects: block, wedge, cage of origin, parentage
+# Test: linear mixed model, normal distribution
+# Results in Table S4
+meanRE.model <- brm(meanRE ~ Genotype + Infected + log10(CIpN) + (1|Wedge) + (1|Block),
+                  data=d,family="zero_inflated_beta",warmup=1000,iter=3000,
+                  chains=1,cores=1,inits="random")
+
 # Frequency of check-ins per night at each location as a function of location,
 # strain, infection status, block, wedge, cage of origin, mouse, parentage
 # Possible fixed effects: location, strain, infection status, block
 # Possible random effects: wedge, cage of origin, parentage, mouse
 # Test: linear mixed model, normal distribution
-# Results in Table S???
+# Results in Table S18
 d <- select(mice2021GxE,Mouse,Wedge,Genotype,Infected,Block,
             Feeder,Tower,Base,Left,Right,Nights)
 d <- filter(d,!(Mouse%in%behaviorSelection))
@@ -108,6 +118,7 @@ Location.model <- brm(log10(CIpN)~Location+Genotype+Infected+Block+
 # Possible fixed effects: strain, infection status, sibship, cage-sharing
 # Possible random effects: wedge, block, individual ID
 # Test: linear mixed model, logistic
+# Results shown in Table S5
 d2 <- full.2021.assoc.info
 d2 <- d2[complete.cases(d2$SocAssoc15),]
 d2 <- d2[complete.cases(d2$fullSib),]
@@ -129,7 +140,18 @@ assoc.model.2min <- brm(Num2min|trials(Denom2min) ~ Genotype + infection + cageO
                          (1|mm(id1,id2)),
                        data=d2,family="binomial",warmup=1000,iter=5000,
                        chains=1,cores=1,inits="random")
+# And with shared space use, although note that the model is of a slightly
+# different form since shared space use isn't following a binomial process.
+d2 <- full.2021.assoc.info
+d3 <- d2[complete.cases(d2$SpaceUse,d2$fullSib),]
+d3 <- filter(d3,!(id1%in%behaviorSelection|id2%in%behaviorSelection))
+assoc.model.space <- brm(SpaceUse ~ Genotype + infection + cageOverlap + fullSib + 
+                         (1|mm(id1,id2)),
+                       data=d3,family="zero_inflated_beta",warmup=1000,iter=5000,
+                       chains=1,cores=1,inits="random")
+
 # Pearson's r for correlations between various overlap window metrics
+# Results shown in Table S19
 cor(d2$SocAssoc15,d2$SocAssoc,method="pearson")
 cor(d2$SocAssoc15,d2$SocAssoc240,method="pearson")
 cor(d2$SocAssoc15,d2$SocAssoc2min,method="pearson")
@@ -137,6 +159,7 @@ cor(d2$SocAssoc,d2$SocAssoc240,method="pearson")
 cor(d2$SocAssoc,d2$SocAssoc2min,method="pearson")
 cor(d2$SocAssoc240,d2$SocAssoc2min,method="pearson")
 # And 15-minute overlaps in the post-challenge period
+# Again, we don't show these results, but it's a thing you can do!
 PTassoc.model <- brm(Num15.2|trials(Denom15.2) ~ Genotype + infection + 
                        + cageOverlap + fullSib +
                        (1|Block) + (1|Wedge) + (1|mm(id1,id2)),
@@ -149,6 +172,7 @@ PTassoc.model <- brm(Num15.2|trials(Denom15.2) ~ Genotype + infection +
 # In general, we want to use absolute quantities of immune cells, rather than
 # the relative proportions, since those proportions are a little more complex
 # for us to model.  The absolute quantities have all been log-transformed.
+# Results shown in part in Table S7
 d <- left_join(mice2021GxE,
                select(wbc2021Trap,Mouse,WBC_count:Bas_percent),
                by="Mouse")
@@ -177,6 +201,17 @@ Dist.neu.model <- brms::brm(Neu_count~log10(DistpN)+Genotype+Block,
 Dist.lym.model <- brms::brm(Lym_count~log10(DistpN)+Genotype+Block,
                            data=d,silent=2,refresh=0,chains=1)
 
+RE.bas.model <- brm(Bas_count~meanRE+Genotype+Block,
+                    data=d,silent=2,refresh=0,chains=1)
+RE.eos.model <- brm(Eos_count~meanRE+Genotype+Block,
+                    data=d,silent=2,refresh=0,chains=1)
+RE.mon.model <- brm(Mon_count~meanRE+Genotype+Block,
+                    data=d,silent=2,refresh=0,chains=1)
+RE.neu.model <- brm(Neu_count~meanRE+Genotype+Block,
+                    data=d,silent=2,refresh=0,chains=1)
+RE.lym.model <- brm(Lym_count~meanRE+Genotype+Block,
+                    data=d,silent=2,refresh=0,chains=1)
+
 # Next we examine relationships between social associations and immune
 # similarities.  For these analyses we prefer to consider whether the mice have
 # the same or different infection status, rather than what their statuses are.
@@ -189,21 +224,21 @@ Dist.lym.model <- brms::brm(Lym_count~log10(DistpN)+Genotype+Block,
 
 # First we analyze the relationship between T cell similarities and social
 # associations.
-# Both CD4 and CD8 T cells in the MLNs (Fig. 3A)
+# Both CD4 and CD8 T cells in the MLNs (Fig. 3A, Table S8)
 d2 <- full.2021.assoc.info
 d2 <- d2[complete.cases(d2$combTcellJI,d2$fullSib,d2$SocAssoc15),]
 Tmem.MLN.model.2 <-  brm(combTcellJI ~ SocAssoc15 + Genotype + InfDiff + fullSib +
                            (1|mm(id1,id2)),
                          data=d2,family="Beta",warmup=1000,iter=3000,
                          cores=1,chains=1,inits="random")
-# CD4 T cells in the MLNs (Fig. 3A, 3B)
+# CD4 T cells in the MLNs (Fig. 3A, 3B, Table S8)
 d2 <- full.2021.assoc.info
 d2 <- d2[complete.cases(d2$SocAssoc15,d2$CD4JI,d2$fullSib),]
 CD4.model.2 <- brm(CD4JI ~ SocAssoc15 + Genotype + InfDiff + fullSib +
                      (1|mm(id1,id2)),
                    data=d2,family="Beta",warmup=1000,iter=3000,
                    cores=1,chains=1,inits="random")
-# CD4 T cells in the MLNs without feeders and only at feeders (Fig. 4B)
+# CD4 T cells in the MLNs without feeders and only at feeders (Fig. 4B, Table S15)
 CD4.noF.model <- brm(CD4JI ~ SocAssoc15noF + Genotype + InfDiff + fullSib +
                         (1|mm(id1,id2)),
                       data=d2,family="Beta",warmup=1000,iter=3000,
@@ -212,7 +247,7 @@ CD4.feeder.model <- brm(CD4JI ~ SocAssoc15feeder + Genotype + InfDiff + fullSib 
                            (1|mm(id1,id2)),
                          data=d2,family="Beta",warmup=1000,iter=5000,
                          cores=1,chains=1,inits="random")
-# CD4 T cells in the MLNs with various overlap windows (Fig. 4C)
+# CD4 T cells in the MLNs with various overlap windows (Fig. 4C, Table S13)
 d2 <- full.2021.assoc.info
 d2 <- d2[complete.cases(d2$CD4JI,d2$fullSib,d2$SocAssoc),]
 CD4.1hr.model <- brm(CD4JI ~ SocAssoc + Genotype + InfDiff + fullSib +
@@ -227,21 +262,21 @@ CD4.2min.model <- brm(CD4JI ~ SocAssoc2min + Genotype + InfDiff + fullSib +
                          (1|mm(id1,id2)),
                        data=d2,family="Beta",warmup=1000,iter=3000,
                        cores=1,chains=1,inits="random")
-# CD8 T cells in the MLNs (Fig. 3A, 3B)
+# CD8 T cells in the MLNs (Fig. 3A, 3B, Table S8)
 d2 <- full.2021.assoc.info
 d2 <- d2[complete.cases(d2$SocAssoc15,d2$CD4JI,d2$fullSib),]
 CD8.model <- brm(CD4JI ~ SocAssoc15 + Genotype + InfDiff + fullSib +
                      (1|mm(id1,id2)),
                    data=d2,family="Beta",warmup=1000,iter=3000,
                    cores=1,chains=1,inits="random")
-# CD4 and CD8 T cells in the peripheral blood (Fig. 3A)
+# CD4 and CD8 T cells in the peripheral blood (Fig. 3A, Table S8)
 d2 <- full.2021.assoc.info
 d2 <- d2[complete.cases(d2$combTbloodJI,d2$fullSib,d2$SocAssoc15),]
 BloodT.model.2 <-  brm(combTbloodJI ~ SocAssoc15 + Genotype + InfDiff + fullSib +
                            (1|mm(id1,id2)),
                          data=d2,family="Beta",warmup=1000,iter=3000,
                          cores=1,chains=1,inits="random")
-# B cells in the MLNs (Fig. 3A)
+# B cells in the MLNs (Fig. 3A, Table S8)
 d2 <- full.2021.assoc.info
 d2 <- d2[complete.cases(d2$SocAssoc15,d2$BcellJI,d2$fullSib),]
 Bcell.model.2 <- brm(BcellJI ~ SocAssoc15 + Genotype + InfDiff + fullSib +
@@ -249,14 +284,14 @@ Bcell.model.2 <- brm(BcellJI ~ SocAssoc15 + Genotype + InfDiff + fullSib +
              data=d2,family="beta",warmup=1000,iter=3000,
              cores=1,chains=1,inits="random")
 
-# CBC results from peripheral blood (Fig. 3A)
+# CBC results from peripheral blood (Fig. 3A, Table S8)
 d2 <- full.2021.assoc.info
 d2 <- d2[complete.cases(d2$wbcJI,d2$SocAssoc15,d2$fullSib),]
 CBC.JI.model.2 <- brm(wbcJI ~ SocAssoc15 + Genotype + InfDiff + fullSib +
                         (1|mm(id1,id2)),
                       data=d2,family="Beta",warmup=1000,iter=3000,
                       cores=1,chains=1,inits="random")
-# CBC results for association at only feeders and only non-feeders (Fig. S4A)
+# CBC results for association at only feeders and only non-feeders (Fig. S7C, Table S16)
 CBC.noF.model <- brm(wbcJI ~ SocAssoc15noF + Genotype + InfDiff + fullSib +
                        (1|mm(id1,id2)),
                      data=d2,family="Beta",warmup=1000,iter=3000,
@@ -265,7 +300,7 @@ CBC.feeder.model <- brm(wbcJI ~ SocAssoc15feeder + Genotype + InfDiff + fullSib 
                           (1|mm(id1,id2)),
                         data=d2,family="Beta",warmup=1000,iter=3000,
                         cores=1,chains=1,inits="random")
-# CBC results for association across different overlap windows (Fig. S4B)
+# CBC results for association across different overlap windows (Fig. S7B, Table S14)
 CBC.1hr <- brm(wbcJI ~ SocAssoc + Genotype + InfDiff + fullSib +
                  (1|mm(id1,id2)),
                data=d2,family="Beta",warmup=1000,iter=3000,
@@ -278,7 +313,7 @@ CBC.2min <- brm(wbcJI ~ SocAssoc2min + Genotype + InfDiff + fullSib +
                   (1|mm(id1,id2)),
                 data=d2,family="Beta",warmup=1000,iter=3000,
                 cores=1,chains=1,inits="random")
-# CBC results for different sample timings (Fig. 4A)
+# CBC results for different sample timings (Fig. 4A, Table S10)
 d2 <- full.2021.assoc.info
 d2 <- d2[complete.cases(d2$SocAssoc15,d2$fullSib),]
 d3 <- d2[complete.cases(d2$wbcStartJ),]
@@ -292,9 +327,26 @@ CBC.mid.model <- brm(wbcMidJ ~ SocAssoc15 + Genotype + InfDiff + fullSib +
                      data=d3,family="beta",iter=3000,warmup=1000,
                      cores=1,chains=1,inits="random")
 
+# And the results for shared space use
+d2 <- full.2021.assoc.info
+d3 <- d2[complete.cases(d2$CD4JI,d2$fullSib,d2$SpaceUse),]
+# CD4 T cells in the MLNs first (Fig. 4C, Table S13)
+CD4.space.model <- brm(CD4JI ~ SpaceUse + Genotype + InfDiff + fullSib +
+                         (1|mm(id1,id2)),
+                       data=d3,family="Beta",warmup=1000,iter=5000,
+                       cores=1,chains=1,inits="random")
+
+# CBC next (Fig. S7B, Table S14)
+d3 <- d2[complete.cases(d2$wbcJI,d2$fullSib,d2$SpaceUse),]
+CBC.space.model <- brm(wbcJI ~ SpaceUse + Genotype + InfDiff + fullSib +
+                         (1|mm(id1,id2)),
+                       data=d2,family="Beta",warmup=1000,iter=5000,
+                       cores=1,chains=1,inits="random")
+
 # We also want to assess the influence of the microbiome for each of these
 # different aspects of immune similarity, as well as how microbiome similarity
 # correlates with social association.
+# Results shown in Table S12
 # First we check the relationship between microbiome and association.
 d2 <- full.2021.assoc.info
 d2 <- d2[complete.cases(d2$SocAssoc15,d2$mbJI,d2$fullSib),]
@@ -303,7 +355,7 @@ Micro.model <- brm(mbJI ~ SocAssoc15 + Genotype + InfDiff + fullSib +
                    data=d2,family="beta",warmup=1000,iter=3000,
                    cores=1,chains=1,inits="random")
 # Next we consider how microbiome fits with a few aspects of T cell similarity
-# in the MLNs (Fig. 4D for the CD4 results).
+# in the MLNs (Fig. 4B for the CD4 results).
 d2 <- full.2021.assoc.info
 d2 <- d2[complete.cases(d2$SocAssoc15,d2$combTcellJI,d2$mbJI,d2$fullSib),]
 Tmem.micro.model <- brm(combTcellJI ~ SocAssoc15 + Genotype + InfDiff + fullSib + mbJI +
@@ -314,7 +366,7 @@ CD4.micro.model <- brm(CD4JI ~ SocAssoc15 + Genotype + InfDiff + fullSib + mbJI 
                          (1|mm(id1,id2)),
                        data=d2,family="beta",warmup=1000,iter=3000,
                        cores=1,chains=1,inits="random")
-# Then we consider how microbiome fits with CBC similarity (Fig. S4C).
+# Then we consider how microbiome fits with CBC similarity (Fig. S7A).
 d2 <- full.2021.assoc.info
 d2 <- d2[complete.cases(d2$SocAssoc15,d2$wbcJI,d2$mbJI,d2$fullSib),]
 CBC.micro.model <- brm(wbcJI ~ SocAssoc15 + Genotype + InfDiff + fullSib + mbJI +
@@ -329,5 +381,24 @@ Bcell.micro.model <- brm(BcellJI ~ SocAssoc15 + Genotype + InfDiff + fullSib + m
                          data=d2,family="beta",warmup=1000,iter=3000,
                          cores=1,chains=1,inits="random")
 
+# Another category of immune phenotype is cytokine phenotypes
+# Results shown in Fig. 3C, Table S9
+# First, the plasma cytokine similarities (note the different model form!)
+d2 <- full.2021.assoc.info
+d2 <- d2[complete.cases(d2$PCytDist,d2$fullSib,d2$SocAssoc15),]
+PCyt.mnhttn <- brm(log(PCytDist) ~ SocAssoc15 + Genotype + InfDiff + fullSib +
+                           (1|mm(id1,id2)),
+                         data=d2,family="gaussian",warmup=1000,iter=3000,
+                         cores=1,chains=1,inits="random")
 
+# Next the MLN cytokine production
+d2 <- full.2021.assoc.info
+d2 <- d2[complete.cases(d2$cytProdDist,d2$fullSib,d2$SocAssoc15),]
+d2 <- d2[which(is.infinite(d2$cytProdDist)==FALSE),]
+cytProd.model <- brm(log(cytProdDist) ~ SocAssoc15 + Genotype + InfDiff + fullSib +
+                       (1|mm(id1,id2)),
+                     data=d2,family="Gaussian",iter=3000,warmup=1000,
+                     cores=1,chains=1,inits="random")
+
+# The next script is results.plotting.R
 

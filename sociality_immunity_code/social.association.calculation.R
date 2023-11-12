@@ -1796,4 +1796,24 @@ full.2021.assoc.info <- d
 # It can be used for studying social association behavior and for models of
 # the relationships between said behavior and immune parameters.
 
+# We want to analyze similarity of space use for individuals for the purposes
+# of studying how immune similarity relates to space use.
+# We can use Jaccard index on check-ins at different locations within an
+# enclosure, without adjusting for differences in check-in abundance, since
+# that wouldn't make sense to do.
+
+d <- filter(mice2021GxE,Lost.RFID.1==FALSE&Lost.RFID.2==FALSE)%>%
+  select(Mouse,Feeder:Right)
+d2 <- as.matrix(vegan::vegdist(d[,2:6],method="jaccard"))
+# There is an individual with no check-ins, but just one, so we don't need to
+# remove them from the dataset.
+rownames(d2) <- colnames(d2) <- d$Mouse
+d2 <- collate.matrix(d2,NumDenom=FALSE)
+d2 <- rename(d2,AI=SocAssoc)
+d2 <- merge.AI(full.2021.assoc.info,d2)
+d2 <- rename(d2,SpaceUse=NewAI)
+d2$SpaceUse <- 1-d2$SpaceUse # Again we flip the metric to get similarity.
+full.2021.assoc.info <- d2
+
+# The next script is immune.similarity.calculation.R
 

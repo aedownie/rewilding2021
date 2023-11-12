@@ -405,3 +405,5 @@ d$Mouse <- as.character(d$Mouse)
 d <- left_join(mice2021total,d,by="Mouse")
 mice2021total <- d
 
+# The next script is social.association.calculation.R
+
